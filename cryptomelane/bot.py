@@ -4,7 +4,7 @@ import asyncio
 import ipaddress
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, TypedDict
+from typing import Any, Dict, Mapping, Tuple, TypedDict
 
 from irctokens.line import Line
 from ircstates.numerics import RPL_YOUREOPER, RPL_RSACHALLENGE2, RPL_ENDOFRSACHALLENGE2
@@ -75,7 +75,6 @@ class Cryptomelane:
     async def send_testmasks(self):
         for network in self.IPs:
             self.irc.write_cmd('TESTMASK', f'*@{network.compressed}')
-        ...
 
     async def handle_testmask_response(self, line: Line):
         me: str
@@ -135,23 +134,76 @@ class Cryptomelane:
 
         await self.handle_connect(nick, ident, host, ip_addy)
 
+    @staticmethod
+    def extract_connect(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address]:
+        """
+        Extract Nick, ident, host, and IP from a CONNECT server notice
+
+        :raises ValueError: If the notice is invalid in some way
+        :return: nick, ident, host, IP
+        """
+        nick: str
+        ident: str
+        host: str
+        ip: str
+
+        if msg.startswith('CLICONN'):
+            # local variant
+            (_, nick, ident, host, ip, *_) = msg.split(' ')
+
+        elif msg.startswith('Client connecting:'):
+            (_, _, nick, userhost, ip, *_) = msg.split(' ')
+
+            split = userhost.split('@')
+            ident, host = split[0][1:], split[1][:-1]
+            ip = ip[1:-1]
+
+        else:
+            raise ValueError(f'I dont know how to break {msg!r} up')
+
+        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(ip)
+
+        return nick, ident, host, ip_addy
+
+    @staticmethod
+    def extract_quit(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address]:
+        if msg.startswith('CLIEXIT'):
+            # local
+            (_, nick, ident, host, ip, *_) = msg.split(' ')
+
+        elif msg.startswith('Client exiting:'):
+            (_, _, nick, userhost, *rest) = msg.split(' ')
+            ip = rest[-1]
+
+            split = userhost.split('@')
+            ident, host = split[0][1:], split[1][:-1]
+            ip = ip[1:-1]
+
+        else:
+            raise ValueError(f'I dont know how to break {msg!r} up')
+
+        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(ip)
+        return nick, ident, host, ip_addy
+
     async def handle_connect(self, nick: str, ident: str, host: str, ip: ipaddress.IPv4Address | ipaddress.IPv6Address):
         async with self.IPs_lock:
             for net, data in self.IPs.items():
                 if ip not in net:
                     continue
 
+                log_msg = f'{nick}!{ident}@{host} [{ip}]'
                 data.user_count += 1
                 if data.user_count > data.max_user_count:
                     self.logger.info(
-                        f'User {nick}!{ident}@{host} [{ip}] pushes {data.network} to {data.user_count} which is > than {data.max_user_count}. Killing'
+                        f'User {log_msg} pushes {data.network} to {data.user_count} which is > than {data.max_user_count}. Killing'
                     )
                     self.kill_user(nick, data.message)
                     data.user_count -= 1
 
                 else:
                     self.logger.info(
-                        f'User {nick}!{ident}@{host} [{ip}] falls under check for {data.network}. Count now at {data.user_count} (max {data.max_user_count})')
+                        f'User {log_msg} matches {data.network}. Count now at {data.user_count} (max {data.max_user_count})'
+                    )
 
                 break
 
@@ -173,39 +225,3 @@ class Cryptomelane:
 
     async def stop(self, msg: str = 'stop requested'):
         await self.irc.stop(msg)
-
-    async def testing_things(self):
-        class fakeIRC:
-            def write_cmd(*args, **kwargs):
-                self.logger.info(f'KILLED! {args}, {kwargs}')
-
-        self.irc = fakeIRC()
-        self.IPs[ipaddress.ip_network('127.0.0.0/8')] = IPUsers('bang', ipaddress.ip_network('127.0.0.0/8'), 2, 1)
-        self.IPs[ipaddress.ip_network('10::/64')] = IPUsers('bang', ipaddress.ip_network('10::/64'), 20, 0)
-        await self.on_snotice(
-            Line(None, 'test.server', 'NOTICE', [
-                '*', '*** Notice -- CLICONN a_nick ident some.host 127.0.0.1 asd asd asd'
-            ])
-        )
-
-        await self.on_snotice(
-            Line(None, 'test.server', 'NOTICE', [
-                '*', '*** Notice -- CLICONN a_nick2 ident some.host 127.0.0.2 asd asd asd'
-            ])
-        )
-
-        for i in range(100):
-            if i % 3 == 0:
-                await self.on_snotice(
-                    Line(None, 'test.server', 'NOTICE', [
-                        '*', f'*** Notice -- CLICONN a_nick{i} ident some.host 127.0.{i}.2 asd asd asd'
-                    ])
-                )
-
-            else:
-                await self.on_snotice(
-                    Line(None, 'test.server', 'NOTICE', [
-                        '*', f'*** Notice -- CLICONN a_nick{i} ident some.host 10::{i} asd asd asd'
-                    ])
-                )
-        ...

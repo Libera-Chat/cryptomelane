@@ -1,0 +1,14 @@
+[masks_to_ban]
+    [masks_to_ban.'192.168.1.0/24']
+    message   = 'Too many users on your IP'
+    max_users = 1337
+
+[irc]
+host    = 'irc.libera.chat'
+port    = 6697
+use_tls = true
+
+
+nick     = 'cryptomelane'
+ident    = 'ripmtrx'
+realname = 'Internal IRC bot'

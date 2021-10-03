@@ -22,7 +22,7 @@ def setup_loggers():
         },
         'loggers': {
             'irc': {'level': logging.DEBUG, 'handlers': ['console']},
-            'lodestone': {'level': logging.DEBUG, 'handlers': ['console']},
+            'cryptomelane': {'level': logging.DEBUG, 'handlers': ['console']},
         }
     }
 

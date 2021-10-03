@@ -46,7 +46,7 @@ class IPUsers:
 
 class Cryptomelane:
     def __init__(self, config: BotConfig) -> None:
-        self.irc = IRC(config.irc)
+        self.irc: IRC = IRC(config.irc)
         self.logger = logging.getLogger('cryptomelane')
         self.config = config
         self.IPs_lock = asyncio.Lock()
@@ -60,6 +60,7 @@ class Cryptomelane:
             )
 
         self.irc.hook_command('727', self.handle_testmask_response)
+        self.irc.hook_command('NOTICE', self.on_snotice)
         self.challenge: Challenge | None = None
 
     async def run(self):
@@ -102,6 +103,9 @@ class Cryptomelane:
 
     async def on_snotice(self, line: Line):
         """Wait for a server notice matching what we expect."""
+        if line.source is None or '@' in line.source:
+            return  # Not a server notice
+
         msg: str = line.params[-1]
         if not msg.startswith('*** Notice -- '):
             return
@@ -137,8 +141,6 @@ class Cryptomelane:
                 if ip not in net:
                     continue
 
-                self.logger.info(f'User {nick}!{ident}@{host} [{ip}] falls under check for {data.network}')
-
                 data.user_count += 1
                 if data.user_count > data.max_user_count:
                     self.logger.info(
@@ -146,6 +148,10 @@ class Cryptomelane:
                     )
                     self.kill_user(nick, data.message)
                     data.user_count -= 1
+
+                else:
+                    self.logger.info(
+                        f'User {nick}!{ident}@{host} [{ip}] falls under check for {data.network}. Count now at {data.user_count} (max {data.max_user_count})')
 
                 break
 
@@ -167,3 +173,39 @@ class Cryptomelane:
 
     async def stop(self, msg: str = 'stop requested'):
         await self.irc.stop(msg)
+
+    async def testing_things(self):
+        class fakeIRC:
+            def write_cmd(*args, **kwargs):
+                self.logger.info(f'KILLED! {args}, {kwargs}')
+
+        self.irc = fakeIRC()
+        self.IPs[ipaddress.ip_network('127.0.0.0/8')] = IPUsers('bang', ipaddress.ip_network('127.0.0.0/8'), 2, 1)
+        self.IPs[ipaddress.ip_network('10::/64')] = IPUsers('bang', ipaddress.ip_network('10::/64'), 20, 0)
+        await self.on_snotice(
+            Line(None, 'test.server', 'NOTICE', [
+                '*', '*** Notice -- CLICONN a_nick ident some.host 127.0.0.1 asd asd asd'
+            ])
+        )
+
+        await self.on_snotice(
+            Line(None, 'test.server', 'NOTICE', [
+                '*', '*** Notice -- CLICONN a_nick2 ident some.host 127.0.0.2 asd asd asd'
+            ])
+        )
+
+        for i in range(100):
+            if i % 3 == 0:
+                await self.on_snotice(
+                    Line(None, 'test.server', 'NOTICE', [
+                        '*', f'*** Notice -- CLICONN a_nick{i} ident some.host 127.0.{i}.2 asd asd asd'
+                    ])
+                )
+
+            else:
+                await self.on_snotice(
+                    Line(None, 'test.server', 'NOTICE', [
+                        '*', f'*** Notice -- CLICONN a_nick{i} ident some.host 10::{i} asd asd asd'
+                    ])
+                )
+        ...

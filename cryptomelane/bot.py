@@ -11,6 +11,9 @@ from ircstates.numerics import RPL_YOUREOPER, RPL_RSACHALLENGE2, RPL_ENDOFRSACHA
 
 from cryptomelane.irc import IRC, IRCConfig
 from ircchallenge import Challenge
+import re
+NETJOIN = re.compile(r'^Netjoin \S+ <-> \S+')
+NETSPLIT = re.compile(r'^Server \S+ split from')
 
 
 @dataclass
@@ -79,7 +82,9 @@ class Cryptomelane:
         await self.irc.stopped
 
     def send_testmasks(self):
+        self.logger.info('Sending TESTMASKs')
         for network in self.IPs:
+            self.logger.info(f'sending testmask for {network.compressed}')
             self.irc.write_cmd('TESTMASK', f'*@{network.compressed}')
 
     async def handle_testmask_response(self, line: Line):
@@ -128,6 +133,9 @@ class Cryptomelane:
             elif msg.startswith('CLIEXIT') or msg.startswith('Client exiting'):
                 nick, ident, host, ip = self.extract_quit(msg)
                 await self.handle_quit(nick, ident, host, ip)
+
+            elif NETSPLIT.match(msg) or NETJOIN.match(msg):
+                self.send_testmasks()
 
             else:
                 # Not an snote we care about

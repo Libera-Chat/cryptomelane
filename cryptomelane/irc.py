@@ -35,13 +35,7 @@ class IRCConfig:
     oper_user: str = ''
     oper_passwd: str = ''
 
-    challenge_key_path = ''
-    challenge_key_passwd = ''
-
-    # TODO: challenge stuff
-    # TODO: SASL EXTERNAL stuff
-
-    join_channels: list[str] = field(default_factory=lambda: list(('#adtestchan', '#anothertestchan')))
+    join_channels: list[str] = field(default_factory=list)
 
     @staticmethod
     def from_dict(d: Mapping[str, Any]) -> IRCConfig:

@@ -73,10 +73,12 @@ class Cryptomelane:
         # Connected, lets oper
         await self.do_challenge()
         self.irc.write_cmd('MODE', self.irc.nick, '+s', '+cF')
+        self.irc.write_cmd('MODE', self.irc.nick, '-w+s', '-s')
+        self.send_testmasks()
 
         await self.irc.stopped
 
-    async def send_testmasks(self):
+    def send_testmasks(self):
         for network in self.IPs:
             self.irc.write_cmd('TESTMASK', f'*@{network.compressed}')
 
@@ -104,6 +106,7 @@ class Cryptomelane:
             return
 
         async with self.IPs_lock:
+            self.logger.info(f'TESTMASK for {ip} received. Current total is {total}')
             self.IPs[ip].user_count = total
 
     async def on_snotice(self, line: Line):
@@ -127,7 +130,7 @@ class Cryptomelane:
                 await self.handle_quit(nick, ident, host, ip)
 
             else:
-                self.logger.warning(f'unable to parse snotice {line=}. bailing')
+                # Not an snote we care about
                 return
 
         except ValueError:

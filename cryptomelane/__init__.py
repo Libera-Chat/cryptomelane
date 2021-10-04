@@ -21,7 +21,7 @@ def setup_loggers():
             }
         },
         'loggers': {
-            'irc': {'level': logging.DEBUG, 'handlers': ['console']},
+            'irc': {'level': logging.INFO, 'handlers': ['console']},
             'cryptomelane': {'level': logging.DEBUG, 'handlers': ['console']},
         }
     }

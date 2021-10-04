@@ -8,7 +8,6 @@ from .bot import Cryptomelane, BotConfig
 
 if __name__ == '__main__':
     conf = BotConfig.from_dict(toml.load('./config.toml'))
-    print(conf)
     b = Cryptomelane(conf)
     loop = asyncio.get_event_loop()
 

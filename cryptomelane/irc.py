@@ -180,7 +180,6 @@ class IRC:
                         available_caps.append(cap.split('=')[0])
 
                 caps_to_request = set(self.caps_to_request) & set(available_caps)
-                print(caps_to_request, self.caps_to_request, available_caps)
 
                 self.write_cmd('CAP', 'REQ', ' '.join(caps_to_request))
                 continue

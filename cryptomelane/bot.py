@@ -251,7 +251,7 @@ class Cryptomelane:
 
     def kill_user(self, nick: str, message: str):
         self.logger.info(f'Killing {nick!r} with message {message!r}')
-        # self.irc.write_cmd('KILL', nick, message)
+        self.irc.write_cmd('KILL', nick, message)
 
     async def do_challenge(self):
         """Do CHALLENGE based authentication"""

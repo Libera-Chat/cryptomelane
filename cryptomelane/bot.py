@@ -39,6 +39,7 @@ class BotConfig:
 class MaskDict(TypedDict):
     message: str
     max_users: int
+    log_only: bool
 
 
 @dataclass
@@ -62,7 +63,8 @@ class Cryptomelane:
             self.IPs[network] = IPUsers(
                 message=rules['message'],
                 network=network,
-                max_user_count=rules['max_users']
+                max_user_count=rules['max_users'],
+                log_only=rules.get('log_only', False)
             )
 
         self.irc.hook_command('727', self.handle_testmask_response)

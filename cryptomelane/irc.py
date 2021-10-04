@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import functools
+import inspect
 import itertools
 import logging
 import ssl
+import traceback
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Mapping, cast
 
 import irctokens
-import inspect
-import traceback
+from ircstates.numerics import RPL_SASLSUCCESS
 
 
 @dataclass
@@ -159,6 +161,9 @@ class IRC:
         self.connected_fut.set_result(None)
 
     async def negotiate_capabilities(self) -> None:
+        if self.config.sasl_plain_passwd != '' and self.config.sasl_plain_user != '':
+            self.caps_to_request['sasl'] = False
+
         if len(self.caps_to_request) == 0:
             return
 
@@ -167,7 +172,13 @@ class IRC:
             subcmd = cmd.params[1]
             if subcmd == 'LS':
                 available_caps: list[str] = cmd.params[-1].split(' ')
+                for cap in list(available_caps):
+                    if '=' in cap:
+                        available_caps.remove(cap)
+                        available_caps.append(cap.split('=')[0])
+
                 caps_to_request = set(self.caps_to_request) & set(available_caps)
+                print(caps_to_request, self.caps_to_request, available_caps)
 
                 self.write_cmd('CAP', 'REQ', ' '.join(caps_to_request))
                 continue
@@ -179,6 +190,14 @@ class IRC:
             elif subcmd == 'ACK':
                 self.enabled_caps = cmd.params[-1].split(' ')
                 break
+
+        if any('sasl' in x for x in self.enabled_caps):
+            self.write_cmd('AUTHENTICATE PLAIN')
+            await self.await_command('AUTHENTICATE', lambda l: '+' in l.params)
+            to_encode = (
+                f'{self.config.sasl_plain_user}\0{self.config.sasl_plain_user}\0{self.config.sasl_plain_passwd}').encode()
+            self.write_cmd('AUTHENTICATE', f'{base64.b64encode(to_encode).decode()}')
+            await self.await_command(RPL_SASLSUCCESS)
 
         self.write_cmd('CAP', 'END')
 
@@ -265,9 +284,7 @@ class IRC:
 
         def callback(line: irctokens.Line):
             if predicate is None or predicate(line):
-                print('removing command')
                 self.remove_command_hook(command_name, callback)
-                print(f'setting future {fut}')
                 if fut.cancelled():
                     self.logger.warning('future for await_command cancelled')
                     return

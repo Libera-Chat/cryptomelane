@@ -28,8 +28,9 @@ class BotConfig:
 
         challenge_key_path = d.get('challenge', {}).get('key_path', '')
         challenge_key_password = d.get('challenge', {}).get('key_password', '')
+        challenge_user = d.get('challenge', {}).get('user', '')
 
-        return BotConfig(d['masks_to_ban'], challenge_key_path, challenge_key_password, IRCConfig.from_dict(d['irc']))
+        return BotConfig(d['masks_to_ban'], challenge_user, challenge_key_path, challenge_key_password, IRCConfig.from_dict(d['irc']))
 
 
 class MaskDict(TypedDict):
@@ -71,6 +72,7 @@ class Cryptomelane:
         await self.irc.await_command('001')
         # Connected, lets oper
         await self.do_challenge()
+        self.irc.write_cmd('MODE', self.irc.nick, '+s', '+cF')
 
         await self.irc.stopped
 
@@ -95,7 +97,9 @@ class Cryptomelane:
             return
 
         total = local+remote
-        ip = ipaddress.ip_network(mask.removeprefix('*!*@'))
+        if mask.startswith('*!*@'):
+            mask = mask[4:]
+        ip = ipaddress.ip_network(mask)
         if ip not in self.IPs:
             return
 
@@ -111,7 +115,8 @@ class Cryptomelane:
         if not msg.startswith('*** Notice -- '):
             return
 
-        msg = msg.removeprefix('*** Notice -- ')
+        msg = msg[14:]
+
         try:
             if msg.startswith('CLICONN') or msg.startswith('Client connecting'):
                 nick, ident, host, ip = self.extract_connect(msg)

@@ -12,8 +12,7 @@ from ircstates.numerics import RPL_YOUREOPER, RPL_RSACHALLENGE2, RPL_ENDOFRSACHA
 from cryptomelane.irc import IRC, IRCConfig
 from ircchallenge import Challenge
 import re
-NETJOIN = re.compile(r'^Netjoin \S+ <-> \S+')
-NETSPLIT = re.compile(r'^Server \S+ split from')
+NETSPLIT = re.compile(r'^Net(join|split) \S+ <-> \S+')
 
 
 @dataclass
@@ -144,7 +143,7 @@ class Cryptomelane:
 
                 await self.handle_quit(nick, ident, host, ip)
 
-            elif NETSPLIT.match(msg) or NETJOIN.match(msg):
+            elif NETSPLIT.match(msg):
                 self.send_testmasks()
 
             else:

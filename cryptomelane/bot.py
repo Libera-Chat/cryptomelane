@@ -144,6 +144,7 @@ class Cryptomelane:
                 await self.handle_quit(nick, ident, host, ip)
 
             elif NETSPLIT.match(msg):
+                self.logger.info(f'{msg.split(" ")[0]} detected! re-requesting')
                 self.send_testmasks()
 
             else:

@@ -245,8 +245,9 @@ class Cryptomelane:
                     continue
 
                 log_msg = f'{nick}!{ident}@{host} [{ip}]'
-                self.logger.info(f'User {log_msg} matches {data.network}. decrementing')
                 data.user_count -= 1
+                self.logger.info(
+                    f'User {log_msg} matches {data.network}. decrementing. Count is now {data.user_count} (max {data.max_user_count})')
                 break
 
     def kill_user(self, nick: str, message: str):

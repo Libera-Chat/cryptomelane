@@ -16,6 +16,7 @@ from ircchallenge import Challenge
 @dataclass
 class BotConfig:
     ips_to_check: dict[str, MaskDict]
+    challenge_user: str
     challenge_key_path: str
     challenge_key_passwd: str
     irc: IRCConfig
@@ -42,6 +43,7 @@ class IPUsers:
     network: ipaddress.IPv6Network | ipaddress.IPv4Network
     max_user_count: int
     user_count: int = 0
+    log_only: bool = False
 
 
 class Cryptomelane:
@@ -110,29 +112,22 @@ class Cryptomelane:
             return
 
         msg = msg.removeprefix('*** Notice -- ')
-        nick: str
-        ident: str
-        host: str
-        ip: str
+        try:
+            if msg.startswith('CLICONN') or msg.startswith('Client connecting'):
+                nick, ident, host, ip = self.extract_connect(msg)
+                await self.handle_connect(nick, ident, host, ip)
 
-        if msg.startswith('CLICONN'):
-            # local variant
-            (_, nick, ident, host, ip, *_) = msg.split(' ')
+            elif msg.startswith('CLIEXIT') or msg.startswith('Client exiting'):
+                nick, ident, host, ip = self.extract_quit(msg)
+                await self.handle_quit(nick, ident, host, ip)
 
-        elif msg.startswith('Client connecting:'):
-            (_, _, nick, userhost, ip, *_) = msg.split(' ')
+            else:
+                self.logger.warning(f'unable to parse snotice {line=}. bailing')
+                return
 
-            split = userhost.split('@')
-            ident, host = split[0][1:], split[1][:-1]
-            ip = ip[1:-1]
-
-        else:
-            self.logger.warning(f'Unable to parse snotice {line=}. Bailing')
+        except ValueError:
+            self.logger.warning(f'unable to parse snotice {line=}. bailing')
             return
-
-        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(ip)
-
-        await self.handle_connect(nick, ident, host, ip_addy)
 
     @staticmethod
     def extract_connect(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address]:
@@ -197,8 +192,8 @@ class Cryptomelane:
                     self.logger.info(
                         f'User {log_msg} pushes {data.network} to {data.user_count} which is > than {data.max_user_count}. Killing'
                     )
-                    self.kill_user(nick, data.message)
-                    data.user_count -= 1
+                    if not data.log_only:
+                        self.kill_user(nick, data.message)
 
                 else:
                     self.logger.info(
@@ -207,9 +202,20 @@ class Cryptomelane:
 
                 break
 
+    async def handle_quit(self, nick: str, ident: str, host: str, ip: ipaddress.IPv4Address | ipaddress.IPv6Address):
+        async with self.IPs_lock:
+            for net, data in self.IPs.items():
+                if ip not in net:
+                    continue
+
+                log_msg = f'{nick}!{ident}@{host} [{ip}]'
+                self.logger.info(f'User {log_msg} matches {data}. decrementing')
+                data.user_count -= 1
+                break
+
     def kill_user(self, nick: str, message: str):
         self.logger.info(f'Killing {nick!r} with message {message!r}')
-        self.irc.write_cmd('KILL', nick, message)
+        # self.irc.write_cmd('KILL', nick, message)
 
     async def do_challenge(self):
         """Do CHALLENGE based authentication"""
@@ -218,6 +224,8 @@ class Cryptomelane:
         def on_rpl_chal(line: Line):
             challenge.push(line.params[-1])
 
+        self.irc.hook_command(RPL_RSACHALLENGE2, on_rpl_chal)
+        self.irc.write_cmd('CHALLENGE', self.config.challenge_user)
         await self.irc.await_command(RPL_ENDOFRSACHALLENGE2)
         self.irc.remove_command_hook(RPL_RSACHALLENGE2, on_rpl_chal)
         self.irc.write_cmd('CHALLENGE', f'+{challenge.finalise()}')

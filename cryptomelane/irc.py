@@ -143,6 +143,8 @@ class IRC:
         self._read_task = asyncio.create_task(self._read_loop())
 
         self.setup_listeners()
+        if self.config.server_password != '':
+            self.write_cmd('PASS', self.config.server_password)
 
         caps = self.negotiate_capabilities()
         self.write_cmd('CAP', 'LS', '302')

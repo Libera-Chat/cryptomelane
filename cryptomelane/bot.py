@@ -75,8 +75,8 @@ class Cryptomelane:
         await self.irc.await_command('001')
         # Connected, lets oper
         await self.do_challenge()
-        self.irc.write_cmd('MODE', self.irc.nick, '+s', '+cF')
-        self.irc.write_cmd('MODE', self.irc.nick, '-w+s', '-s')
+        self.irc.write_cmd('MODE', self.irc.nick, '+s', '+cFs')
+        self.irc.write_cmd('MODE', self.irc.nick, '-w')
         self.send_testmasks()
 
         await self.irc.stopped
@@ -128,10 +128,18 @@ class Cryptomelane:
         try:
             if msg.startswith('CLICONN') or msg.startswith('Client connecting'):
                 nick, ident, host, ip = self.extract_connect(msg)
+                if ip is None:
+                    # spoofed, dont care
+                    return
+
                 await self.handle_connect(nick, ident, host, ip)
 
             elif msg.startswith('CLIEXIT') or msg.startswith('Client exiting'):
                 nick, ident, host, ip = self.extract_quit(msg)
+                if ip is None:
+                    # spoofed, dont care
+                    return
+
                 await self.handle_quit(nick, ident, host, ip)
 
             elif NETSPLIT.match(msg) or NETJOIN.match(msg):
@@ -146,7 +154,7 @@ class Cryptomelane:
             return
 
     @staticmethod
-    def extract_connect(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    def extract_connect(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address | None]:
         """
         Extract Nick, ident, host, and IP from a CONNECT server notice
 
@@ -172,12 +180,16 @@ class Cryptomelane:
         else:
             raise ValueError(f'I dont know how to break {msg!r} up')
 
-        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(ip)
+        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address | None
+        if ip == '0':
+            ip_addy = None
+        else:
+            ip_addy = ipaddress.ip_address(ip)
 
         return nick, ident, host, ip_addy
 
     @staticmethod
-    def extract_quit(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    def extract_quit(msg: str) -> Tuple[str, str, str, ipaddress.IPv4Address | ipaddress.IPv6Address | None]:
         if msg.startswith('CLIEXIT'):
             # local
             (_, nick, ident, host, ip, *_) = msg.split(' ')
@@ -193,7 +205,13 @@ class Cryptomelane:
         else:
             raise ValueError(f'I dont know how to break {msg!r} up')
 
-        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(ip)
+        ip_addy: ipaddress.IPv4Address | ipaddress.IPv6Address | None
+        if ip == '0':
+            ip_addy = None
+
+        else:
+            ip_addy = ipaddress.ip_address(ip)
+
         return nick, ident, host, ip_addy
 
     async def handle_connect(self, nick: str, ident: str, host: str, ip: ipaddress.IPv4Address | ipaddress.IPv6Address):

@@ -243,7 +243,7 @@ class Cryptomelane:
                     continue
 
                 log_msg = f'{nick}!{ident}@{host} [{ip}]'
-                self.logger.info(f'User {log_msg} matches {data}. decrementing')
+                self.logger.info(f'User {log_msg} matches {data.network}. decrementing')
                 data.user_count -= 1
                 break
 

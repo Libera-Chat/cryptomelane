@@ -264,7 +264,7 @@ class Cryptomelane:
 
                     self.kill_user(nick, ip_user.message)
 
-    async def _check(
+    def _check(
         self,
         nick: str,
         ident: str,

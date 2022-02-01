@@ -316,6 +316,9 @@ class Cryptomelane:
 
         if to_check.exclude is not None:
             for ex in to_check.exclude:
+                if ip not in ex:
+                    continue
+
                 self.logger.info(
                     f"{log_msg} is excluded by {ex} in {to_check.name} ({to_check.network}) -- skipping"
                 )

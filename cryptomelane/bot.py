@@ -287,12 +287,14 @@ class Cryptomelane:
                 # this connect matched this IPUser instance.
 
                 log_msg = f"{nick}!{ident}@{host} [{ip}]"
-                self.logger.info(f"{log_msg:<60} matches {ip_user:<30}. Incrementing")
+                self.logger.info(
+                    f"{log_msg:<60} matches {str(ip_user):<30}. Incrementing"
+                )
                 ip_user.user_count += 1
 
                 if ip_user.user_count > ip_user.max_user_count:
                     self.logger.info(
-                        f"{log_msg:<60} pushes {ip_user:<31} past max. Killing user"
+                        f"{log_msg:<60} pushes {str(ip_user):<31} past max. Killing user"
                     )
                     if ip_user.log_only:
                         continue
@@ -320,7 +322,7 @@ class Cryptomelane:
                     continue
 
                 self.logger.info(
-                    f"{log_msg:<60} is excluded by {ex} in {to_check:<30} -- skipping"
+                    f"{log_msg:<60} is excluded by {ex} in {str(to_check):<30} -- skipping"
                 )
                 return False
 
@@ -340,7 +342,7 @@ class Cryptomelane:
 
                 log_msg = f"{nick}!{ident}@{host} [{ip}]"
                 self.logger.info(
-                    f"{log_msg:<60} matches {ip_user:<30}. Decrementing (now {ip_user.user_count - 1})"
+                    f"{log_msg:<60} matches {str(ip_user):<30}. Decrementing (now {ip_user.user_count - 1})"
                 )
                 ip_user.user_count -= 1
 

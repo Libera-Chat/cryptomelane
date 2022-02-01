@@ -4,8 +4,8 @@ import asyncio
 import ipaddress
 import logging
 import re
-from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Tuple, TypedDict
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Tuple, TypedDict, Union
 from webbrowser import get
 
 from ircchallenge import Challenge
@@ -43,21 +43,30 @@ class BotConfig:
         )
 
 
-class MaskDict(TypedDict):
+class _BaseMaskDict(TypedDict):
     message: str
     max_users: int
     log_only: bool
+
+
+class MaskDict(_BaseMaskDict, Total=False):
+    exclude: list[str]
+    name: str
+
+
+NET = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+ADD = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
 
 @dataclass
 class IPUsers:
     message: str
     name: str
-    network: ipaddress.IPv6Network | ipaddress.IPv4Network
+    network: NET
     max_user_count: int
     user_count: int = 0
     log_only: bool = False
-    exclude: list[ipaddress.IPv6Network | ipaddress.IPv4Network] | None = None
+    exclude: list[NET] = field(default_factory=list)
 
     def __str__(self) -> str:
         return f"{self.name} [{self.network}] ({self.user_count}/{self.max_user_count})"
@@ -69,15 +78,19 @@ class Cryptomelane:
         self.logger = logging.getLogger("cryptomelane")
         self.config = config
         self.IPs_lock = asyncio.Lock()
-        self.IPs: Dict[ipaddress.IPv6Network | ipaddress.IPv4Network, IPUsers] = {}
+        self.IPs: Dict[NET, IPUsers] = {}
         for net, rules in self.config.ips_to_check.items():
             network = ipaddress.ip_network(net)
+            excludes = []
+            if (ex := rules.get("exclude")) is not None:
+                excludes = [ipaddress.ip_network(x) for x in ex]
+
             self.IPs[network] = IPUsers(
                 message=rules["message"],
                 network=network,
                 max_user_count=rules["max_users"],
                 log_only=rules.get("log_only", False),
-                exclude=rules.get("exclude", None),
+                exclude=excludes,
                 name=rules.get("name", str(net)),
             )
 
@@ -99,9 +112,14 @@ class Cryptomelane:
 
     def send_testmasks(self):
         self.logger.info("Sending TESTMASKs")
+        to_send = set()
         for network in self.IPs:
-            self.logger.info(f"sending testmask for {network.compressed}")
-            self.irc.write_cmd("TESTMASK", f"*@{network.compressed}")
+            to_send.add(network)
+            to_send.update(self.IPs[network].exclude)
+
+        for net in to_send:
+            self.logger.info(f"sending testmask for {net.compressed}")
+            self.irc.write_cmd("TESTMASK", f"*@{net.compressed}")
 
     async def handle_testmask_response(self, line: Line):
         me: str
@@ -124,13 +142,30 @@ class Cryptomelane:
         total = local + remote
         if mask.startswith("*!*@"):
             mask = mask[4:]
-        ip = ipaddress.ip_network(mask)
-        if ip not in self.IPs:
+
+        try:
+            net = ipaddress.ip_network(mask)
+        except ValueError as e:
+            self.logger.exception(f"Could not parse {mask} as an IP Network: {e}")
             return
 
+        self.logger.info(f"Got a TESTMASK response for {net}")
+
         async with self.IPs_lock:
-            self.logger.info(f"TESTMASK for {ip} received. Current total is {total}")
-            self.IPs[ip].user_count = total
+            for ip_user in self.IPs.values():
+                if net in ip_user.exclude:
+                    self.logger.info(
+                        f"TESTMASK {net} is in {ip_user}'s excludes. Subtracting {total}"
+                    )
+                    # this is excluded, subtract the total to maintain the number
+                    ip_user.user_count -= total
+
+                if net == ip_user.network:
+                    # this is the network we're checking
+                    self.logger.info(
+                        f"TESTMASK {net} is the network {ip_user} works on. Adding"
+                    )
+                    ip_user.user_count += total
 
     async def on_snotice(self, line: Line):
         """Wait for a server notice matching what we expect."""

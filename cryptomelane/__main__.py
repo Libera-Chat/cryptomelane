@@ -1,13 +1,14 @@
-import sys
 import asyncio
+import logging
 import signal
+import sys
 
 import toml
 
-from .bot import Cryptomelane, BotConfig
+from .bot import BotConfig, Cryptomelane
 
-if __name__ == '__main__':
-    conf = BotConfig.from_dict(toml.load('./config.toml'))
+if __name__ == "__main__":
+    conf = BotConfig.from_dict(toml.load("./config.toml"))
     b = Cryptomelane(conf)
     loop = asyncio.get_event_loop()
 

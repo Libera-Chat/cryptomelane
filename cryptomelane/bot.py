@@ -288,7 +288,7 @@ class Cryptomelane:
 
                 log_msg = f"{nick}!{ident}@{host} [{ip}]"
                 self.logger.info(
-                    f"{log_msg:<100} matches {str(ip_user):>60}. Incrementing"
+                    f"{log_msg:<100} matches {str(ip_user):>60}. Incrementing (now {ip_user.user_count+1})"
                 )
                 ip_user.user_count += 1
 

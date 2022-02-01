@@ -163,7 +163,7 @@ class Cryptomelane:
                 if net == ip_user.network:
                     # this is the network we're checking
                     self.logger.info(
-                        f"TESTMASK {net} is the network {ip_user} works on. Adding"
+                        f"TESTMASK {net} is the network {ip_user} works on. Adding {total}"
                     )
                     ip_user.user_count += total
 
@@ -309,9 +309,9 @@ class Cryptomelane:
     ) -> bool:
         log_msg = f"{nick}!{ident}@{host} ({ip})"
         if ip not in to_check.network:
-            self.logger.debug(
-                f"{log_msg} is not within {to_check.name} ({to_check.network}) -- ignoring"
-            )
+            # self.logger.debug(
+            #     f"{log_msg} is not within {to_check.name} ({to_check.network}) -- ignoring"
+            # )
             return False
 
         if to_check.exclude is not None:

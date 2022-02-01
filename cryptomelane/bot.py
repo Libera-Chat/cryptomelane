@@ -117,7 +117,7 @@ class Cryptomelane:
             to_send.add(network)
             to_send.update(self.IPs[network].exclude)
 
-        for net in sorted(to_send, reverse=True):
+        for net in sorted(to_send):
             self.logger.info(f"sending testmask for {net.compressed}")
             self.irc.write_cmd("TESTMASK", f"*@{net.compressed}")
 

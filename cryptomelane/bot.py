@@ -49,7 +49,7 @@ class _BaseMaskDict(TypedDict):
     log_only: bool
 
 
-class MaskDict(_BaseMaskDict, Total=False):
+class MaskDict(_BaseMaskDict, total=False):
     exclude: list[str]
     name: str
 

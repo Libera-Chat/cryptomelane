@@ -113,9 +113,11 @@ class Cryptomelane:
     def send_testmasks(self):
         self.logger.info("Sending TESTMASKs")
         to_send = set()
-        for network in self.IPs:
-            to_send.add(network)
-            to_send.update(self.IPs[network].exclude)
+        for ip_user in self.IPs.values():
+            to_send.add(ip_user.network)
+            to_send.update(ip_user.exclude)
+            ip_user.user_count = 0
+            self.logger.debug(f"Set {ip_user} to 0")
 
         for net in sorted(to_send):
             self.logger.info(f"sending testmask for {net.compressed}")
@@ -196,6 +198,7 @@ class Cryptomelane:
                 await self.handle_quit(nick, ident, host, ip)
 
             elif NETSPLIT.match(msg):
+
                 self.logger.info(f'{msg.split(" ")[0]} detected! re-requesting')
                 self.send_testmasks()
 

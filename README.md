@@ -26,6 +26,9 @@ If you need to exclude a range within a larger range, you can use the
 list `excludes` with CIDR strings. Users on these ranges will not be counted
 towards the limit.
 
+For testing, you can set `log_only` to have the bot log behaviour to its logger
+but not actually take any action (though note it will still state it killed the user)
+
 ## How this all works
 
 This relies on solanum TESTMASK on startup to gain insight into numbers, and from
